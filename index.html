@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Logístico Express</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .forzar-mayusculas {
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-dark bg-dark px-3">
+        <span class="navbar-brand mb-0 h1">Logística Metalmecánica</span>
+        <div id="usuario-info" class="d-none align-items-center">
+            <span id="label-rol" class="badge bg-secondary me-2"></span>
+            <button id="btn-cerrar-sesion" class="btn btn-danger btn-sm">Salir</button>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4 px-4">
+
+        <!-- LOGIN -->
+        <div id="vista-login" class="card mx-auto shadow mt-5" style="max-width: 400px;">
+            <div class="card-header bg-primary text-white text-center">
+                <h4>Iniciar Sesión</h4>
+            </div>
+            <div class="card-body">
+                <form id="form-login">
+                    <div class="mb-3">
+                        <label class="form-label">Usuario</label>
+                        <input type="text" id="login-username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contraseña</label>
+                        <input type="password" id="login-password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- PRINCIPAL -->
+        <div id="vista-principal" class="d-none">
+
+            <ul class="nav nav-tabs mb-4">
+                <li class="nav-item">
+                    <button class="nav-link active" data-tab="inventario" id="btn-tab-inventario">📦 Inventario</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="movimientos" id="btn-tab-movimientos">🔄 Movimientos</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="usuarios" id="btn-tab-usuarios">👥 Usuarios (CRUD)</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-tab="auditoria" id="btn-tab-auditoria">📜 Auditoría</button>
+                </li>
+            </ul>
+
+            <!-- PESTAÑA INVENTARIO -->
+            <div id="pestana-inventario" class="tab-pane active">
+                <div class="row g-2 mb-3 align-items-center bg-white p-3 rounded shadow-sm">
+                    <div class="col-md-3">
+                        <input type="text" id="filtro-buscar" class="form-control forzar-mayusculas" placeholder="Buscar por SKU o Nombre...">
+                    </div>
+                    <div class="col-md-2">
+                        <select id="filtro-categoria" class="form-select">
+                            <option value="TODAS">-- Todas las Categorías --</option>
+                            <option value="LUBRICACIÓN">LUBRICACIÓN</option>
+                            <option value="LIMPIEZA">LIMPIEZA</option>
+                            <option value="MECANIZADO">MECANIZADO</option>
+                            <option value="GENERAL">GENERAL</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7 text-end">
+                        <a href="/productos/plantilla-excel" class="btn btn-outline-secondary btn-sm me-2">📄 Plantilla Excel</a>
+                        <button class="btn btn-success btn-sm me-2" id="btn-abrir-modal-producto">➕ Crear Ítem </button>
+                        <a href="/productos/exportar-excel" class="btn btn-outline-success btn-sm me-2">📊 Exportar Excel</a>
+                        <button class="btn btn-primary btn-sm" id="btn-refrescar-inventario">🔄 Refrescar</button>
+                    </div>
+                </div>
+
+                <div class="card p-2 mb-3 bg-white shadow-sm">
+                    <form id="form-carga-masiva" class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <span class="fw-bold fs-7">Carga Masiva:</span>
+                        </div>
+                        <div class="col-auto">
+                            <input type="file" id="file-excel" class="form-control form-control-sm" accept=".xlsx, .csv" required>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-dark btn-sm">Subir Excel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="table-responsive bg-white shadow-sm rounded">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>SKU / Código</th>
+                                <th>Conjunto Padre</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Cantidad</th>
+                                <th>U.M.</th>
+                                <th>Precio ($)</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-productos"></tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <span id="info-paginacion" class="text-muted"></span>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0" id="ul-paginacion"></ul>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- PESTAÑA MOVIMIENTOS -->
+            <div id="pestana-movimientos" class="tab-pane d-none">
+                <div class="card p-4 shadow-sm bg-white mx-auto" style="max-width: 700px;">
+                    <h4>Registrar Movimientos de Stock</h4>
+
+                    <div class="mb-3 position-relative">
+                        <label class="form-label">Buscar Ítem por SKU o Nombre</label>
+                        <input type="text" id="mov-buscar-sku" class="form-control forzar-mayusculas" placeholder="Ej: PTM..." autocomplete="off">
+                        <div id="mov-sugerencias" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1000; max-height: 220px; overflow-y: auto;"></div>
+                    </div>
+
+                    <div id="mov-item-seleccionado" class="d-none border rounded p-3 mb-3 bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong id="mov-sel-nombre"></strong>
+                            <span class="text-muted">Stock actual: <span id="mov-sel-stock" class="fw-bold"></span></span>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-md-4">
+                                <label class="form-label">Cantidad</label>
+                                <input type="number" id="mov-sel-cantidad" class="form-control" min="1" value="1">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Tipo</label>
+                                <select id="mov-sel-tipo" class="form-select">
+                                    <option value="INGRESO">Entrada</option>
+                                    <option value="SALIDA">Salida</option>
+                                    <option value="AJUSTE">Ajuste (cantidad final)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Observación</label>
+                                <input type="text" id="mov-sel-obs" class="form-control">
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm mt-3" id="btn-agregar-al-lote">➕ Agregar a la lista</button>
+                    </div>
+
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Observación</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-lote-movimientos">
+                            <tr id="fila-lote-vacio"><td colspan="5" class="text-center text-muted">Aún no agregaste ítems</td></tr>
+                        </tbody>
+                    </table>
+
+                    <button type="button" class="btn btn-primary w-100" id="btn-guardar-lote" disabled>Guardar Movimientos</button>
+                </div>
+            </div>
+
+            <!-- PESTAÑA USUARIOS -->
+            <div id="pestana-usuarios" class="tab-pane d-none">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card p-3 shadow-sm bg-white">
+                            <h5 id="titulo-form-user">Crear Usuario</h5>
+                            <form id="form-usuario">
+                                <input type="hidden" id="user-id">
+                                <div class="mb-2">
+                                    <label class="form-label">Username</label>
+                                    <input type="text" id="user-name" class="form-control" required>
+                                    <div class="form-text">Se guarda tal cual lo escribas (respeta mayúsculas/minúsculas).</div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Email (Opcional)</label>
+                                    <input type="email" id="user-email" class="form-control">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Contraseña</label>
+                                    <input type="password" id="user-pass" class="form-control">
+                                    <div class="form-text">Dejar vacío al editar si no querés cambiarla.</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Rol</label>
+                                    <select id="user-rol" class="form-select" required>
+                                        <option value="1">Administrador</option>
+                                        <option value="2">Coordinador</option>
+                                        <option value="3">Operario</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">Guardar</button>
+                                <button type="button" class="btn btn-secondary w-100 mt-2" id="btn-cancelar-user">Cancelar</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-md-8">
+                        <div class="table-responsive bg-white shadow-sm rounded">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Usuario</th>
+                                        <th>Email</th>
+                                        <th>Rol</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-usuarios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA AUDITORÍA -->
+            <div id="pestana-auditoria" class="tab-pane d-none">
+                <div class="table-responsive bg-white shadow-sm rounded">
+                    <table class="table table-striped table-hover align-middle mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Acción</th>
+                                <th>Tabla</th>
+                                <th>IP</th>
+                                <th>Detalles</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-auditoria"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL CREAR/EDITAR PRODUCTO -->
+    <div class="modal fade" id="modalProducto" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="tituloModalProd">Producto</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formProd">
+                        <input type="hidden" id="prod-modo-edit">
+                        <div class="mb-2">
+                            <label class="form-label">Código SKU</label>
+                            <input type="text" id="prod-sku" class="form-control forzar-mayusculas" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">SKU Padre / Conjunto (Opcional)</label>
+                            <input type="text" id="prod-padre" class="form-control forzar-mayusculas" placeholder="Ej: PTM-003">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Nombre</label>
+                            <input type="text" id="prod-nombre" class="form-control forzar-mayusculas" required>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Categoría</label>
+                            <input type="text" id="prod-categoria" class="form-control forzar-mayusculas" placeholder="LUBRICACIÓN, LIMPIEZA, ETC." required>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Stock Actual</label>
+                                <input type="number" id="prod-stock" class="form-control" value="0">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Unidad Medida</label>
+                                <input type="text" id="prod-um" class="form-control forzar-mayusculas" value="UND" required>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Stock Mínimo</label>
+                                <input type="number" id="prod-min" class="form-control" value="5">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Precio Unitario ($)</label>
+                                <input type="number" step="0.01" id="prod-precio" class="form-control" value="0.00">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Guardar Ítem</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL HISTORIAL -->
+    <div class="modal fade" id="modalHistorial" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="tituloHistorial">Historial del Ítem</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Usuario</th>
+                                <th>Observación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-historial-item"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let inventarioCompletoCache = [];
+        let carritoMovimientos = [];
+        let productoSeleccionadoActual = null;
+        let token = localStorage.getItem("token_jwt");
+        let userRol = localStorage.getItem("user_rol");
+        let paginaActual = 1;
+
+        // Caches en memoria: guardamos los objetos completos que devuelve
+        // el backend, en vez de reconstruirlos a partir de strings inyectados
+        // en atributos onclick (eso era lo que se rompía si un nombre de
+        // producto tenía un apóstrofe, por ejemplo).
+        let productosCache = {};
+        let usuariosCache = {};
+
+        window.onload = function () {
+            if (token) mostrarAplicacion();
+            configurarEventos();
+        };
+
+        function configurarEventos() {
+            document.getElementById("form-login").addEventListener("submit", iniciarSesion);
+            document.getElementById("btn-cerrar-sesion").addEventListener("click", cerrarSesion);
+
+            document.querySelectorAll("[data-tab]").forEach(btn => {
+                btn.addEventListener("click", () => cambiarPestana(btn.dataset.tab));
+            });
+
+            document.getElementById("filtro-buscar").addEventListener("keyup", () => cargarInventario(1));
+            document.getElementById("filtro-categoria").addEventListener("change", () => cargarInventario(1));
+            document.getElementById("btn-abrir-modal-producto").addEventListener("click", abrirModalProducto);
+            document.getElementById("btn-refrescar-inventario").addEventListener("click", () => cargarInventario(paginaActual));
+            document.getElementById("form-carga-masiva").addEventListener("submit", cargarMasivo);
+            document.getElementById("formProd").addEventListener("submit", guardarProductoManual);
+            document.getElementById("mov-buscar-sku").addEventListener("input", manejarBusquedaMovimiento);
+            document.getElementById("btn-agregar-al-lote").addEventListener("click", agregarAlLote);
+            document.getElementById("btn-guardar-lote").addEventListener("click", guardarLoteMovimientos);
+            document.getElementById("tbody-lote-movimientos").addEventListener("click", manejarClickLote);
+            document.getElementById("form-usuario").addEventListener("submit", guardarUsuario);
+            document.getElementById("btn-cancelar-user").addEventListener("click", limpiarFormUser);
+
+            // Delegación de eventos: en vez de un onclick por cada botón
+            // de cada fila (que se regenera constantemente al re-renderizar
+            // la tabla), un solo listener en el contenedor escucha todos
+            // los clicks y decide qué hacer según el data-accion del botón.
+            document.getElementById("tabla-productos").addEventListener("click", manejarClickProductos);
+            document.getElementById("tabla-usuarios").addEventListener("click", manejarClickUsuarios);
+        }
+
+        // --- MOVIMIENTOS CON FILTRO Y LOTE ---
+
+            async function cargarInventarioCompleto() {
+                const { ok, data } = await apiFetch(`/productos?limit=100&page=1`);
+                if (ok) inventarioCompletoCache = data.datos;
+            }
+
+            function manejarBusquedaMovimiento(e) {
+                const texto = e.target.value.trim().toUpperCase();
+                const contenedor = document.getElementById("mov-sugerencias");
+                contenedor.innerHTML = "";
+
+                if (!texto) return;
+
+                const coincidencias = inventarioCompletoCache
+                    .filter(p => p.codigo_sku.includes(texto) || p.nombre.includes(texto))
+                    .slice(0, 8);
+
+                coincidencias.forEach(p => {
+                    const item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "list-group-item list-group-item-action";
+                    item.innerHTML = `<strong>${escapeHtml(p.codigo_sku)}</strong> — ${escapeHtml(p.nombre)} <span class="text-muted">(stock: ${p.stock_actual})</span>`;
+                    item.addEventListener("click", () => seleccionarProductoMovimiento(p));
+                    contenedor.appendChild(item);
+                });
+            }
+
+            function seleccionarProductoMovimiento(p) {
+                productoSeleccionadoActual = p;
+                document.getElementById("mov-buscar-sku").value = p.codigo_sku;
+                document.getElementById("mov-sugerencias").innerHTML = "";
+                document.getElementById("mov-sel-nombre").innerText = `${p.codigo_sku} — ${p.nombre}`;
+                document.getElementById("mov-sel-stock").innerText = p.stock_actual;
+                document.getElementById("mov-sel-cantidad").value = 1;
+                document.getElementById("mov-sel-obs").value = "";
+                document.getElementById("mov-item-seleccionado").classList.remove("d-none");
+            }
+
+            function agregarAlLote() {
+                if (!productoSeleccionadoActual) return;
+
+                const cantidad = parseInt(document.getElementById("mov-sel-cantidad").value);
+                if (!cantidad || cantidad <= 0) {
+                    alert("Ingresá una cantidad válida");
+                    return;
+                }
+
+                carritoMovimientos.push({
+                    codigo_sku: productoSeleccionadoActual.codigo_sku,
+                    nombre: productoSeleccionadoActual.nombre,
+                    cantidad: cantidad,
+                    tipo: document.getElementById("mov-sel-tipo").value,
+                    observacion: document.getElementById("mov-sel-obs").value
+                });
+
+                renderizarLote();
+
+                // Reset del panel de selección para cargar el siguiente ítem
+                productoSeleccionadoActual = null;
+                document.getElementById("mov-buscar-sku").value = "";
+                document.getElementById("mov-item-seleccionado").classList.add("d-none");
+                document.getElementById("mov-buscar-sku").focus();
+            }
+
+            function renderizarLote() {
+                const tbody = document.getElementById("tbody-lote-movimientos");
+                tbody.innerHTML = "";
+
+                if (carritoMovimientos.length === 0) {
+                    tbody.innerHTML = `<tr id="fila-lote-vacio"><td colspan="5" class="text-center text-muted">Aún no agregaste ítems</td></tr>`;
+                    document.getElementById("btn-guardar-lote").disabled = true;
+                    return;
+                }
+
+                const etiquetas = { INGRESO: "Entrada", SALIDA: "Salida", AJUSTE: "Ajuste" };
+                const colores = { INGRESO: "bg-success", SALIDA: "bg-danger", AJUSTE: "bg-warning text-dark" };
+
+                carritoMovimientos.forEach((m, index) => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td><strong>${escapeHtml(m.codigo_sku)}</strong><br><small class="text-muted">${escapeHtml(m.nombre)}</small></td>
+                        <td><span class="badge ${colores[m.tipo]}">${etiquetas[m.tipo]}</span></td>
+                        <td>${m.cantidad}</td>
+                        <td>${escapeHtml(m.observacion || '-')}</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger" data-index="${index}">🗑️</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById("btn-guardar-lote").disabled = false;
+            }
+
+            function manejarClickLote(e) {
+                const btn = e.target.closest("button[data-index]");
+                if (!btn) return;
+                carritoMovimientos.splice(parseInt(btn.dataset.index), 1);
+                renderizarLote();
+            }
+
+            async function guardarLoteMovimientos() {
+                if (carritoMovimientos.length === 0) return;
+
+                const bodyData = {
+                    movimientos: carritoMovimientos.map(m => ({
+                        codigo_sku: m.codigo_sku,
+                        cantidad: m.cantidad,
+                        tipo: m.tipo,
+                        observacion: m.observacion
+                    }))
+                };
+
+                const { ok, data } = await apiFetch("/inventario/movimientos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(bodyData)
+                });
+
+                if (ok) {
+                    alert("✅ " + data.mensaje);
+                    carritoMovimientos = [];
+                    renderizarLote();
+                    cambiarPestana('inventario');
+                } else {
+                    alert("❌ Error: " + (data?.detail || "No se pudo registrar el lote de movimientos"));
+                }
+            }
+
+            // --- VISIBILIDAD SEGÚN ROL ---
+            // Refleja en el frontend las mismas restricciones que ya aplica el
+            // backend (verificar_roles en main.py), para que el usuario no vea
+            // pestañas o botones que de todos modos no puede usar.
+            function ajustarVisibilidadPorRol() {
+                const liUsuarios = document.getElementById("btn-tab-usuarios").closest("li");
+                const liAuditoria = document.getElementById("btn-tab-auditoria").closest("li");
+
+                liUsuarios.classList.toggle("d-none", userRol !== "ADMIN");
+                liAuditoria.classList.toggle("d-none", !["ADMIN", "COORDINADOR"].includes(userRol));
+
+                // Crear/editar/eliminar producto y carga masiva son solo para
+                // ADMIN y COORDINADOR según el backend; OPERARIO solo consulta
+                // y registra movimientos.
+                const puedeGestionarInventario = ["ADMIN", "COORDINADOR"].includes(userRol);
+                document.getElementById("btn-abrir-modal-producto").classList.toggle("d-none", !puedeGestionarInventario);
+                document.getElementById("form-carga-masiva").closest(".card").classList.toggle("d-none", !puedeGestionarInventario);
+            }
+
+        
+        
+        async function iniciarSesion(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append("username", document.getElementById("login-username").value);
+            formData.append("password", document.getElementById("login-password").value);
+
+            try {
+                const res = await fetch("/login", { method: "POST", body: formData });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Error en el servidor");
+                }
+
+                token = data.access_token;
+                userRol = data.rol;
+                localStorage.setItem("token_jwt", token);
+                localStorage.setItem("user_rol", userRol);
+
+                mostrarAplicacion();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function mostrarAplicacion() {
+            document.getElementById("vista-login").classList.add("d-none");
+            document.getElementById("vista-principal").classList.remove("d-none");
+            document.getElementById("usuario-info").classList.replace("d-none", "d-flex");
+            document.getElementById("label-rol").innerText = "ROL: " + userRol;
+            cargarInventario(1);
+        }
+
+        function cerrarSesion() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        function cambiarPestana(p) {
+            ['inventario', 'movimientos', 'usuarios', 'auditoria'].forEach(tab => {
+                document.getElementById(`pestana-${tab}`).classList.add("d-none");
+                document.getElementById(`btn-tab-${tab}`).classList.remove("active");
+            });
+            document.getElementById(`pestana-${p}`).classList.remove("d-none");
+            document.getElementById(`btn-tab-${p}`).classList.add("active");
+
+            if (p === 'inventario') cargarInventario(paginaActual);
+            if (p === 'movimientos') cargarInventarioCompleto();
+            if (p === 'usuarios') cargarUsuarios();
+            if (p === 'auditoria') cargarAuditoria();
+        }
+
+        // Helper genérico para peticiones autenticadas: siempre toma el
+        // token vigente de localStorage (no de la variable global, que
+        // podía quedar desactualizada) y siempre intenta leer JSON de
+        // la respuesta, incluso en errores.
+        async function apiFetch(url, options = {}) {
+            const tokenActual = localStorage.getItem("token_jwt");
+            options.headers = {
+                ...(options.headers || {}),
+                "Authorization": "Bearer " + tokenActual
+            };
+            const res = await fetch(url, options);
+            let data = null;
+            try {
+                data = await res.json();
+            } catch {
+                data = null;
+            }
+            return { ok: res.ok, status: res.status, data };
+        }
+
+        async function cargarInventario(page = 1) {
+            paginaActual = page;
+            const buscar = document.getElementById("filtro-buscar").value;
+            const cat = document.getElementById("filtro-categoria").value;
+
+            const params = new URLSearchParams({
+                page: page,
+                limit: 10,
+                buscar: buscar,
+                categoria: cat
+            });
+
+            const { ok, data } = await apiFetch(`/productos?${params.toString()}`);
+            if (!ok) {
+                console.error("Error cargando inventario:", data);
+                return;
+            }
+
+            productosCache = {};
+            const tbody = document.getElementById("tabla-productos");
+            tbody.innerHTML = "";
+
+            const puedeGestionar = ["ADMIN", "COORDINADOR"].includes(userRol);
+
+            data.datos.forEach(p => {
+                productosCache[p.codigo_sku] = p;
+
+                // El historial es de solo lectura, así que se muestra para
+                // cualquier rol. Editar/eliminar solo se arman en el HTML
+                // si el rol tiene permiso real en el backend — un OPERARIO
+                // directamente no ve esos botones, en vez de verlos y que
+                // le fallen al hacer click.
+                const botonesAccion = puedeGestionar
+                    ? `
+                        <button class="btn btn-sm btn-outline-info" data-accion="historial" data-sku="${escapeHtml(p.codigo_sku)}">📜 Historial</button>
+                        <button class="btn btn-sm btn-outline-warning" data-accion="editar" data-sku="${escapeHtml(p.codigo_sku)}">✏️</button>
+                        <button class="btn btn-sm btn-outline-danger" data-accion="eliminar" data-sku="${escapeHtml(p.codigo_sku)}">🗑️</button>
+                    `
+                    : `
+                        <button class="btn btn-sm btn-outline-info" data-accion="historial" data-sku="${escapeHtml(p.codigo_sku)}">📜 Historial</button>
+                    `;
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><strong>${escapeHtml(p.codigo_sku)}</strong></td>
+                    <td><span class="badge bg-light text-dark border">${escapeHtml(p.padre_sku || '-')}</span></td>
+                    <td>${escapeHtml(p.nombre)}</td>
+                    <td><span class="badge bg-info text-dark">${escapeHtml(p.categoria)}</span></td>
+                    <td><span class="badge bg-primary fs-6">${p.stock_actual}</span></td>
+                    <td>${escapeHtml(p.unidad_medida)}</td>
+                    <td>$${p.precio_unitario.toFixed(2)}</td>
+                    <td>${botonesAccion}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById("info-paginacion").innerText = `Página ${data.page} de ${data.paginas_totales} (${data.total} ítems totales)`;
+
+            let pagHTML = "";
+            for (let i = 1; i <= data.paginas_totales; i++) {
+                pagHTML += `<li class="page-item ${i === data.page ? 'active' : ''}"><button type="button" class="page-link" data-pagina="${i}">${i}</button></li>`;
+            }
+            const ulPaginacion = document.getElementById("ul-paginacion");
+            ulPaginacion.innerHTML = pagHTML;
+            ulPaginacion.querySelectorAll("[data-pagina]").forEach(btn => {
+                btn.addEventListener("click", () => cargarInventario(parseInt(btn.dataset.pagina)));
+            });
+        }
+
+
+        // Escapa caracteres que podrían romper el HTML o inyectar contenido
+        // no deseado si un nombre/categoría/SKU contiene < > & " '
+        function escapeHtml(texto) {
+            const div = document.createElement("div");
+            div.textContent = texto ?? "";
+            return div.innerHTML;
+        }
+
+        function manejarClickProductos(e) {
+            const btn = e.target.closest("button[data-accion]");
+            if (!btn) return;
+
+            const sku = btn.dataset.sku;
+            const accion = btn.dataset.accion;
+
+            if (accion === "historial") verHistorialItem(sku);
+            if (accion === "editar") editarProductoModal(sku);
+            if (accion === "eliminar") eliminarProducto(sku);
+        }
+
+        function abrirModalProducto() {
+            document.getElementById("prod-modo-edit").value = "";
+            document.getElementById("prod-sku").disabled = false;
+            document.getElementById("prod-stock").disabled = false;
+            document.getElementById("formProd").reset();
+            document.getElementById("tituloModalProd").innerText = "Crear Nuevo Ítem";
+            new bootstrap.Modal(document.getElementById('modalProducto')).show();
+        }
+
+        function editarProductoModal(sku) {
+            const p = productosCache[sku];
+            if (!p) return;
+
+            document.getElementById("prod-modo-edit").value = p.codigo_sku;
+            document.getElementById("prod-sku").value = p.codigo_sku;
+            document.getElementById("prod-sku").disabled = true;
+            document.getElementById("prod-padre").value = p.padre_sku === '-' ? '' : p.padre_sku;
+            document.getElementById("prod-nombre").value = p.nombre;
+            document.getElementById("prod-categoria").value = p.categoria;
+            document.getElementById("prod-um").value = p.unidad_medida;
+            document.getElementById("prod-min").value = p.stock_minimo;
+            document.getElementById("prod-precio").value = p.precio_unitario;
+            document.getElementById("prod-stock").disabled = true;
+
+            document.getElementById("tituloModalProd").innerText = "Editar Ítem";
+            new bootstrap.Modal(document.getElementById('modalProducto')).show();
+        }
+
+        async function guardarProductoManual(e) {
+            e.preventDefault();
+            const editSku = document.getElementById("prod-modo-edit").value;
+
+            const bodyData = {
+                codigo_sku: document.getElementById("prod-sku").value,
+                padre_sku: document.getElementById("prod-padre").value || null,
+                nombre: document.getElementById("prod-nombre").value,
+                categoria: document.getElementById("prod-categoria").value,
+                stock_actual: parseInt(document.getElementById("prod-stock").value) || 0,
+                unidad_medida: document.getElementById("prod-um").value,
+                stock_minimo: parseInt(document.getElementById("prod-min").value) || 5,
+                precio_unitario: parseFloat(document.getElementById("prod-precio").value) || 0
+            };
+
+            const url = editSku ? `/productos/${encodeURIComponent(editSku)}` : `/productos`;
+            const method = editSku ? "PUT" : "POST";
+
+            const { ok, data } = await apiFetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (ok) {
+                alert(editSku ? "✅ Ítem actualizado correctamente" : "✅ Ítem registrado correctamente");
+                bootstrap.Modal.getInstance(document.getElementById('modalProducto')).hide();
+                cargarInventario(paginaActual);
+            } else {
+                const mensajeError = Array.isArray(data?.detail)
+                    ? data.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join("\n")
+                    : (data?.detail || "No se pudo guardar el ítem");
+                alert("❌ Error al guardar ítem: " + mensajeError);
+            }
+        }
+
+        async function eliminarProducto(sku) {
+            if (!confirm(`¿Eliminar ítem ${sku}?`)) return;
+            const { ok, data } = await apiFetch(`/productos/${encodeURIComponent(sku)}`, { method: "DELETE" });
+            if (ok) {
+                cargarInventario(paginaActual);
+            } else {
+                alert("❌ Error: " + (data?.detail || "No se pudo eliminar el ítem"));
+            }
+        }
+
+        async function verHistorialItem(sku) {
+            const { ok, data } = await apiFetch(`/productos/${encodeURIComponent(sku)}/historial`);
+            if (!ok) {
+                alert("❌ Error: " + (data?.detail || "No se pudo cargar el historial"));
+                return;
+            }
+
+            document.getElementById("tituloHistorial").innerText = `Historial de Movimientos: ${sku}`;
+            const tbody = document.getElementById("tabla-historial-item");
+            tbody.innerHTML = "";
+
+            data.forEach(m => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${new Date(m.fecha).toLocaleString()}</td>
+                    <td><span class="badge ${m.tipo === 'INGRESO' ? 'bg-success' : 'bg-danger'}">${escapeHtml(m.tipo)}</span></td>
+                    <td>${m.cantidad}</td>
+                    <td>${escapeHtml(m.usuario)}</td>
+                    <td>${escapeHtml(m.observacion)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            new bootstrap.Modal(document.getElementById('modalHistorial')).show();
+        }
+
+        // --- CRUD USUARIOS ---
+        async function cargarUsuarios() {
+            const { ok, data } = await apiFetch("/admin/usuarios");
+            if (!ok) {
+                console.error("Error cargando usuarios:", data);
+                return;
+            }
+
+            usuariosCache = {};
+            const tbody = document.getElementById("tabla-usuarios");
+            tbody.innerHTML = "";
+
+            data.forEach(u => {
+                usuariosCache[u.id] = u;
+
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${u.id}</td>
+                    <td><strong>${escapeHtml(u.username)}</strong></td>
+                    <td>${escapeHtml(u.email)}</td>
+                    <td><span class="badge bg-secondary">${escapeHtml(u.rol)}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning" data-accion="editar" data-id="${u.id}">✏️</button>
+                        <button class="btn btn-sm btn-outline-danger" data-accion="eliminar" data-id="${u.id}">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function manejarClickUsuarios(e) {
+            const btn = e.target.closest("button[data-accion]");
+            if (!btn) return;
+
+            const id = parseInt(btn.dataset.id);
+            const accion = btn.dataset.accion;
+
+            if (accion === "editar") prepararEdicionUser(id);
+            if (accion === "eliminar") eliminarUsuario(id);
+        }
+
+        function prepararEdicionUser(id) {
+            const u = usuariosCache[id];
+            if (!u) return;
+
+            document.getElementById("user-id").value = u.id;
+            document.getElementById("user-name").value = u.username;
+            document.getElementById("user-name").disabled = true;
+            document.getElementById("user-email").value = u.email === '-' ? '' : u.email;
+            document.getElementById("user-rol").value = u.rol_id;
+            document.getElementById("titulo-form-user").innerText = "Editar Usuario";
+        }
+
+        function limpiarFormUser() {
+            document.getElementById("user-id").value = "";
+            document.getElementById("user-name").disabled = false;
+            document.getElementById("user-name").value = "";
+            document.getElementById("user-email").value = "";
+            document.getElementById("user-pass").value = "";
+            document.getElementById("titulo-form-user").innerText = "Crear Usuario";
+        }
+
+        async function guardarUsuario(e) {
+            e.preventDefault();
+            const id = document.getElementById("user-id").value;
+
+            const bodyData = {
+                username: document.getElementById("user-name").value,
+                email: document.getElementById("user-email").value || null,
+                password: document.getElementById("user-pass").value || "",
+                rol_id: parseInt(document.getElementById("user-rol").value)
+            };
+
+            const url = id ? `/admin/usuarios/${id}` : `/admin/usuarios`;
+            const method = id ? "PUT" : "POST";
+
+            const { ok, data } = await apiFetch(url, {
+                method: method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (ok) {
+                alert(id ? "✅ Usuario actualizado correctamente" : "✅ Usuario creado correctamente");
+                limpiarFormUser();
+                cargarUsuarios();
+            } else {
+                alert("❌ Error: " + (data?.detail || "No se pudo guardar el usuario"));
+            }
+        }
+
+        async function eliminarUsuario(id) {
+            if (!confirm("¿Eliminar usuario?")) return;
+            const { ok, data } = await apiFetch(`/admin/usuarios/${id}`, { method: "DELETE" });
+            if (ok) {
+                cargarUsuarios();
+            } else {
+                alert("❌ Error: " + (data?.detail || "No se pudo eliminar el usuario"));
+            }
+        }
+
+        async function registrarMovimiento(e) {
+            e.preventDefault();
+            const bodyData = {
+                codigo_sku: document.getElementById("mov-sku").value,
+                tipo: document.getElementById("mov-tipo").value,
+                cantidad: parseInt(document.getElementById("mov-cantidad").value),
+                observacion: document.getElementById("mov-obs").value
+            };
+
+            const { ok, data } = await apiFetch("/inventario/movimiento", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (ok) {
+                alert(data.mensaje);
+                document.getElementById("form-movimiento").reset();
+                cambiarPestana('inventario');
+            } else {
+                alert("❌ Error: " + (data?.detail || "No se pudo registrar el movimiento"));
+            }
+        }
+
+        async function cargarMasivo(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById("file-excel");
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            const { ok, data } = await apiFetch("/productos/cargar-masivo", {
+                method: "POST",
+                body: formData
+            });
+
+            if (ok) {
+                let mensaje = data.mensaje;
+                if (data.advertencias && data.advertencias.length > 0) {
+                    mensaje += "\n\nDetalle de filas omitidas:\n" + data.advertencias.join("\n");
+                }
+                alert(mensaje);
+                document.getElementById("form-carga-masiva").reset();
+                cargarInventario(1);
+            } else {
+                alert("❌ Error: " + (data?.detail || "No se pudo procesar el archivo"));
+            }
+        }
+
+        async function cargarAuditoria() {
+            const { ok, data } = await apiFetch("/auditoria/historial");
+            if (!ok) {
+                console.error("Error cargando auditoría:", data);
+                return;
+            }
+
+            const tbody = document.getElementById("tabla-auditoria");
+            tbody.innerHTML = "";
+            data.forEach(l => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${l.id}</td>
+                    <td>${escapeHtml(l.usuario)}</td>
+                    <td>${escapeHtml(l.accion)}</td>
+                    <td>${escapeHtml(l.tabla)}</td>
+                    <td><code>${escapeHtml(l.ip_origen)}</code></td>
+                    <td>${escapeHtml(l.detalles)}</td>
+                    <td>${new Date(l.timestamp).toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
